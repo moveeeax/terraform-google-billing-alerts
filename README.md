@@ -9,7 +9,7 @@ channels.
 
 ```hcl
 module "billing_alerts" {
-  source = "github.com/cybercapybara/terraform-google-billing-alerts"
+  source = "github.com/moveeeax/terraform-google-billing-alerts"
 
   billing_account    = "0123AB-4567CD-89EF01"
   display_name       = "prod-budget"
