@@ -24,8 +24,17 @@ jobs:
       - name: validate
         run: tofu validate
 
+      # Uses mock_provider, so it needs no credentials and makes no API calls.
+      - name: test
+        run: tofu test
+
       - name: validate example
         working-directory: examples/basic
         run: |
           tofu init -backend=false
           tofu validate
+
+      - uses: terraform-linters/setup-tflint@v4
+
+      - name: tflint
+        run: tflint --recursive
