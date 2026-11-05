@@ -9,7 +9,7 @@ channels.
 
 ```hcl
 module "billing_alerts" {
-  source = "github.com/moveeeax/terraform-google-billing-alerts"
+  source = "github.com/moveeeax/terraform-google-billing-alerts?ref=v1.0.0"
 
   billing_account    = "0123AB-4567CD-89EF01"
   display_name       = "prod-budget"
@@ -23,7 +23,7 @@ Omit `projects` to budget the whole billing account:
 
 ```hcl
 module "billing_alerts" {
-  source = "github.com/moveeeax/terraform-google-billing-alerts"
+  source = "github.com/moveeeax/terraform-google-billing-alerts?ref=v1.0.0"
 
   billing_account = "0123AB-4567CD-89EF01"
   display_name    = "all-projects-budget"
@@ -36,7 +36,7 @@ well as the billing admins:
 
 ```hcl
 module "billing_alerts" {
-  source = "github.com/moveeeax/terraform-google-billing-alerts"
+  source = "github.com/moveeeax/terraform-google-billing-alerts?ref=v1.0.0"
 
   billing_account    = "0123AB-4567CD-89EF01"
   display_name       = "prod-forecast"
