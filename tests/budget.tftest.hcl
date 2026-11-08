@@ -125,6 +125,129 @@ run "projects_scope_is_passed_through" {
   }
 }
 
+run "defaults_do_not_publish_to_pubsub" {
+  command = plan
+
+  assert {
+    condition     = length(google_pubsub_topic.this) == 0
+    error_message = "No Pub/Sub topic may be created unless create_pubsub_topic is true."
+  }
+
+  assert {
+    condition     = output.pubsub_topic_id == null
+    error_message = "pubsub_topic_id should be null when Pub/Sub publishing is off."
+  }
+}
+
+run "existing_pubsub_topic_is_published_to" {
+  command = plan
+
+  variables {
+    pubsub_topic = "projects/my-project/topics/budget-events"
+  }
+
+  assert {
+    condition     = length(google_pubsub_topic.this) == 0
+    error_message = "An existing topic must not be created by the module."
+  }
+
+  assert {
+    condition     = length(google_billing_budget.this.all_updates_rule) == 1
+    error_message = "A Pub/Sub topic on its own must produce an all_updates_rule."
+  }
+
+  assert {
+    condition     = google_billing_budget.this.all_updates_rule[0].pubsub_topic == "projects/my-project/topics/budget-events"
+    error_message = "pubsub_topic must be passed through to all_updates_rule."
+  }
+
+  assert {
+    condition     = google_billing_budget.this.all_updates_rule[0].schema_version == "1.0"
+    error_message = "schema_version must be \"1.0\" whenever a Pub/Sub topic is set."
+  }
+
+  assert {
+    condition     = google_billing_budget.this.all_updates_rule[0].monitoring_notification_channels == null
+    error_message = "No monitoring channels were configured, so none may be set."
+  }
+
+  assert {
+    condition     = google_billing_budget.this.all_updates_rule[0].disable_default_iam_recipients != true
+    error_message = "Adding a Pub/Sub topic must not disable the default IAM recipients."
+  }
+
+  assert {
+    condition     = output.pubsub_topic_id == "projects/my-project/topics/budget-events"
+    error_message = "pubsub_topic_id should report the topic in use."
+  }
+}
+
+run "pubsub_topic_and_channels_together" {
+  command = plan
+
+  variables {
+    pubsub_topic = "projects/my-project/topics/budget-events"
+    monitoring_notification_channels = [
+      "projects/my-project/notificationChannels/1234567890",
+    ]
+  }
+
+  assert {
+    condition = google_billing_budget.this.all_updates_rule[0].monitoring_notification_channels == tolist([
+      "projects/my-project/notificationChannels/1234567890",
+    ])
+    error_message = "Channels must survive alongside a Pub/Sub topic."
+  }
+
+  assert {
+    condition     = google_billing_budget.this.all_updates_rule[0].pubsub_topic == "projects/my-project/topics/budget-events"
+    error_message = "The Pub/Sub topic must survive alongside channels."
+  }
+}
+
+run "created_pubsub_topic_is_published_to" {
+  command = plan
+
+  variables {
+    pubsub_topic        = "projects/my-project/topics/budget-events"
+    create_pubsub_topic = true
+  }
+
+  # Under a mock provider the computed id would otherwise be a random string;
+  # pin it to the format the real provider uses.
+  override_resource {
+    target = google_pubsub_topic.this
+    values = {
+      id = "projects/my-project/topics/budget-events"
+    }
+  }
+
+  assert {
+    condition     = length(google_pubsub_topic.this) == 1
+    error_message = "create_pubsub_topic = true must create the topic."
+  }
+
+  assert {
+    condition     = google_pubsub_topic.this[0].project == "my-project" && google_pubsub_topic.this[0].name == "budget-events"
+    error_message = "The created topic's project and name must be parsed from pubsub_topic."
+  }
+
+  assert {
+    condition     = google_billing_budget.this.all_updates_rule[0].pubsub_topic == google_pubsub_topic.this[0].id
+    error_message = "The budget must publish to the topic the module created."
+  }
+
+  assert {
+    condition     = google_billing_budget.this.all_updates_rule[0].schema_version == "1.0"
+    error_message = "schema_version must be \"1.0\" whenever a Pub/Sub topic is set."
+  }
+
+  assert {
+    condition     = output.pubsub_topic_id == google_pubsub_topic.this[0].id
+    error_message = "pubsub_topic_id should report the created topic."
+  }
+}
+
 # --- Input guards ------------------------------------------------------------
 
 run "rejects_empty_threshold_percents" {
@@ -232,4 +355,24 @@ run "rejects_empty_display_name" {
   }
 
   expect_failures = [var.display_name]
+}
+
+run "rejects_bare_pubsub_topic_id" {
+  command = plan
+
+  variables {
+    pubsub_topic = "budget-events"
+  }
+
+  expect_failures = [var.pubsub_topic]
+}
+
+run "rejects_create_pubsub_topic_without_a_name" {
+  command = plan
+
+  variables {
+    create_pubsub_topic = true
+  }
+
+  expect_failures = [google_billing_budget.this]
 }
