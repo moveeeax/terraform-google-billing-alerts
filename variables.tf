@@ -124,3 +124,56 @@ variable "create_pubsub_topic" {
   type        = bool
   default     = false
 }
+
+variable "services" {
+  description = "Services to scope the budget to, as \"services/<service-id>\" (ids come from the Cloud Billing Catalog API). Empty includes all services."
+  type        = list(string)
+  default     = []
+
+  validation {
+    condition     = alltrue([for s in var.services : can(regex("^services/[^/]+$", s))])
+    error_message = "Each entry in services must be the full name \"services/<service-id>\", not a bare service id or display name."
+  }
+}
+
+variable "labels" {
+  description = "Resource label to scope the budget to, as a map with a single key/value pair. Empty includes all usage regardless of labels."
+  type        = map(string)
+  default     = {}
+
+  validation {
+    condition     = length(var.labels) <= 1
+    error_message = "labels accepts a single key/value pair: the Cloud Billing API filters a budget by at most one label."
+  }
+}
+
+variable "subaccounts" {
+  description = "Subaccounts to scope the budget to, as \"billingAccounts/<id>\". Use the parent account's name to include the parent's own usage. Empty includes the parent and every subaccount."
+  type        = list(string)
+  default     = []
+
+  validation {
+    condition = alltrue([
+      for a in var.subaccounts :
+      can(regex("^billingAccounts/[0-9A-Za-z]{6}-[0-9A-Za-z]{6}-[0-9A-Za-z]{6}$", a))
+    ])
+    error_message = "Each entry in subaccounts must be \"billingAccounts/XXXXXX-XXXXXX-XXXXXX\" (here, unlike billing_account, the prefix is required)."
+  }
+}
+
+variable "credit_types_treatment" {
+  description = "How credits count towards spend: INCLUDE_ALL_CREDITS (net cost, the API default), EXCLUDE_ALL_CREDITS (gross cost) or INCLUDE_SPECIFIED_CREDITS (subtract only credit_types). Null leaves it unset, which the API treats as INCLUDE_ALL_CREDITS."
+  type        = string
+  default     = null
+
+  validation {
+    condition     = var.credit_types_treatment == null || contains(["INCLUDE_ALL_CREDITS", "EXCLUDE_ALL_CREDITS", "INCLUDE_SPECIFIED_CREDITS"], var.credit_types_treatment)
+    error_message = "credit_types_treatment must be null, \"INCLUDE_ALL_CREDITS\", \"EXCLUDE_ALL_CREDITS\" or \"INCLUDE_SPECIFIED_CREDITS\"."
+  }
+}
+
+variable "credit_types" {
+  description = "Credit types subtracted from gross cost when credit_types_treatment is INCLUDE_SPECIFIED_CREDITS (e.g. \"COMMITTED_USAGE_DISCOUNT\", \"PROMOTION\"). Must be empty otherwise."
+  type        = list(string)
+  default     = []
+}

@@ -248,6 +248,79 @@ run "created_pubsub_topic_is_published_to" {
   }
 }
 
+run "defaults_emit_no_budget_filter" {
+  command = plan
+
+  # Unchanged from before the filter inputs existed: no filter block, so the
+  # budget covers the whole billing account with the API's credit default.
+  assert {
+    condition     = length(google_billing_budget.this.budget_filter) == 0
+    error_message = "With no filters configured the module must omit budget_filter."
+  }
+}
+
+run "service_label_and_credit_filters_are_passed_through" {
+  command = plan
+
+  variables {
+    services               = ["services/6F81-5844-456A"]
+    labels                 = { team = "data" }
+    subaccounts            = ["billingAccounts/0123AB-4567CD-000001"]
+    credit_types_treatment = "EXCLUDE_ALL_CREDITS"
+  }
+
+  assert {
+    condition     = google_billing_budget.this.budget_filter[0].services == tolist(["services/6F81-5844-456A"])
+    error_message = "services should be passed through to budget_filter."
+  }
+
+  assert {
+    condition     = google_billing_budget.this.budget_filter[0].labels == tomap({ team = "data" })
+    error_message = "labels should be passed through to budget_filter."
+  }
+
+  assert {
+    condition     = google_billing_budget.this.budget_filter[0].subaccounts == tolist(["billingAccounts/0123AB-4567CD-000001"])
+    error_message = "subaccounts should be passed through to budget_filter."
+  }
+
+  assert {
+    condition     = google_billing_budget.this.budget_filter[0].credit_types_treatment == "EXCLUDE_ALL_CREDITS"
+    error_message = "credit_types_treatment should be passed through to budget_filter."
+  }
+
+  assert {
+    condition     = google_billing_budget.this.budget_filter[0].projects == null
+    error_message = "Unset projects must stay null, not an empty set."
+  }
+
+  assert {
+    condition     = google_billing_budget.this.budget_filter[0].credit_types == null
+    error_message = "Unset credit_types must stay null, not an empty list."
+  }
+}
+
+run "credit_treatment_alone_emits_a_filter" {
+  command = plan
+
+  variables {
+    credit_types_treatment = "INCLUDE_SPECIFIED_CREDITS"
+    credit_types           = ["COMMITTED_USAGE_DISCOUNT", "SUSTAINED_USAGE_DISCOUNT"]
+  }
+
+  assert {
+    condition     = length(google_billing_budget.this.budget_filter) == 1
+    error_message = "A credit treatment on its own must produce a budget_filter."
+  }
+
+  assert {
+    condition = google_billing_budget.this.budget_filter[0].credit_types == tolist([
+      "COMMITTED_USAGE_DISCOUNT", "SUSTAINED_USAGE_DISCOUNT",
+    ])
+    error_message = "credit_types should be passed through with INCLUDE_SPECIFIED_CREDITS."
+  }
+}
+
 # --- Input guards ------------------------------------------------------------
 
 run "rejects_empty_threshold_percents" {
@@ -372,6 +445,57 @@ run "rejects_create_pubsub_topic_without_a_name" {
 
   variables {
     create_pubsub_topic = true
+  }
+
+  expect_failures = [google_billing_budget.this]
+}
+
+run "rejects_bare_service_id" {
+  command = plan
+
+  variables {
+    services = ["6F81-5844-456A"]
+  }
+
+  expect_failures = [var.services]
+}
+
+run "rejects_more_than_one_label" {
+  command = plan
+
+  variables {
+    labels = { team = "data", env = "prod" }
+  }
+
+  expect_failures = [var.labels]
+}
+
+run "rejects_unprefixed_subaccount" {
+  command = plan
+
+  variables {
+    subaccounts = ["0123AB-4567CD-000001"]
+  }
+
+  expect_failures = [var.subaccounts]
+}
+
+run "rejects_unknown_credit_types_treatment" {
+  command = plan
+
+  variables {
+    credit_types_treatment = "EXCLUDE_CREDITS"
+  }
+
+  expect_failures = [var.credit_types_treatment]
+}
+
+run "rejects_credit_types_without_specified_treatment" {
+  command = plan
+
+  variables {
+    credit_types_treatment = "INCLUDE_ALL_CREDITS"
+    credit_types           = ["PROMOTION"]
   }
 
   expect_failures = [google_billing_budget.this]

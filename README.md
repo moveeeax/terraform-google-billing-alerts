@@ -86,6 +86,41 @@ on the topic (`pubsub.topics.setIamPolicy`, e.g. Pub/Sub Admin on the topic's
 project) in addition to budget permissions on the billing account. The module
 does not grant any IAM itself.
 
+## Filtering by service, label and credits
+
+A budget on gross cost fires early when committed use discounts or promotional
+credits bring the real bill down, and many teams budget one service or one
+label rather than a whole project. The filter inputs map onto `budget_filter`:
+
+```hcl
+module "billing_alerts" {
+  source = "github.com/moveeeax/terraform-google-billing-alerts?ref=v1.0.0"
+
+  billing_account = "0123AB-4567CD-89EF01"
+  display_name    = "data-team-bigquery"
+  amount          = 2000
+
+  services               = ["services/<bigquery-service-id>"]
+  labels                 = { team = "data" }
+  credit_types_treatment = "INCLUDE_ALL_CREDITS"
+}
+```
+
+- `services` takes `services/<id>` names from the
+  [Cloud Billing Catalog API](https://docs.cloud.google.com/billing/v1/how-tos/catalog-api).
+- `labels` takes a single key/value pair; the API does not accept more than one.
+- `subaccounts` takes `billingAccounts/<id>` names, for a parent account that has subaccounts.
+- `credit_types_treatment` is `INCLUDE_ALL_CREDITS` (net cost),
+  `EXCLUDE_ALL_CREDITS` (gross cost) or `INCLUDE_SPECIFIED_CREDITS`, which
+  subtracts only the `credit_types` you list (e.g. `COMMITTED_USAGE_DISCOUNT`,
+  `PROMOTION`; full list in the
+  [billing export reference](https://docs.cloud.google.com/billing/docs/how-to/export-data-bigquery-tables/detailed-usage)).
+
+All of these default to unset, and an unset `credit_types_treatment` is treated
+by the API as `INCLUDE_ALL_CREDITS`. Setting `INCLUDE_ALL_CREDITS` explicitly,
+as above, is the recommended value: it is what the budget already does, but
+makes the choice visible. Filters combine with `projects`.
+
 ## Who actually gets notified
 
 A budget that applies cleanly but reaches nobody is the easiest mistake to make
@@ -133,6 +168,11 @@ OpenTofu >= 1.7 for `mock_provider`. The module itself still works on 1.5.
 | `monitoring_notification_channels` | Full notification channel resource names to alert, in addition to billing admins. At most 5.         | `list(string)` | `[]`              |    no    |
 | `pubsub_topic`                     | Pub/Sub topic to publish budget notifications to, as `projects/<project>/topics/<topic>`.            | `string`       | `null`            |    no    |
 | `create_pubsub_topic`              | Create the topic named by `pubsub_topic` instead of using an existing one.                           | `bool`         | `false`           |    no    |
+| `services`                         | Services to scope the budget to, as `services/<id>`. Empty includes all services.                    | `list(string)` | `[]`              |    no    |
+| `labels`                           | A single resource label key/value to scope the budget to. Empty ignores labels.                      | `map(string)`  | `{}`              |    no    |
+| `subaccounts`                      | Subaccounts to scope the budget to, as `billingAccounts/<id>`. Empty includes all of them.           | `list(string)` | `[]`              |    no    |
+| `credit_types_treatment`           | How credits count towards spend. Null uses the API default, `INCLUDE_ALL_CREDITS`.                   | `string`       | `null`            |    no    |
+| `credit_types`                     | Credit types to subtract; only with `INCLUDE_SPECIFIED_CREDITS`.                                     | `list(string)` | `[]`              |    no    |
 
 ## Outputs
 

@@ -13,6 +13,10 @@ All notable changes to this module are documented here. The format follows
   `create_pubsub_topic` creates that topic in the module. New output
   `pubsub_topic_id`. Off by default, so existing budgets plan unchanged; the
   default billing-admin email recipients are still never disabled.
+- Budget filters: `services`, `labels` (one key/value pair), `subaccounts`,
+  `credit_types_treatment` and `credit_types` map onto `budget_filter`. All
+  unset by default, so existing budgets plan unchanged. `credit_types` is
+  rejected unless `credit_types_treatment = "INCLUDE_SPECIFIED_CREDITS"`.
 
 ### Changed
 
