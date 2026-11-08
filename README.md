@@ -52,6 +52,40 @@ module "billing_alerts" {
 
 A runnable example lives in [`examples/basic`](examples/basic).
 
+## Publishing to Pub/Sub
+
+Email and monitoring channels tell a person; a Pub/Sub topic lets code react
+(cap spend, disable billing on a sandbox project, post to chat). Set
+`pubsub_topic` to the full topic name and the budget publishes its status there
+at regular intervals, using notification schema `"1.0"`:
+
+```hcl
+module "billing_alerts" {
+  source = "github.com/moveeeax/terraform-google-billing-alerts?ref=v1.0.0"
+
+  billing_account = "0123AB-4567CD-89EF01"
+  display_name    = "sandbox-budget"
+  amount          = 50
+  projects        = ["projects/my-sandbox"]
+
+  pubsub_topic        = "projects/my-automation/topics/budget-events"
+  create_pubsub_topic = true
+}
+```
+
+With `create_pubsub_topic = true` the module creates that topic, taking the
+project and topic id from `pubsub_topic`; leave it `false` (the default) to
+publish to a topic that already exists. Pub/Sub is off unless `pubsub_topic`
+is set. It is added to the email and channel notifications and does not replace
+them.
+
+Per Google's
+[programmatic notifications guide](https://docs.cloud.google.com/billing/docs/how-to/budgets-programmatic-notifications),
+whoever applies the budget needs permission to grant the Pub/Sub Publisher role
+on the topic (`pubsub.topics.setIamPolicy`, e.g. Pub/Sub Admin on the topic's
+project) in addition to budget permissions on the billing account. The module
+does not grant any IAM itself.
+
 ## Who actually gets notified
 
 A budget that applies cleanly but reaches nobody is the easiest mistake to make
@@ -63,7 +97,7 @@ here, so the module is deliberately opinionated:
 - **Billing account administrators and users are always emailed.** The module
   never sets `disable_default_iam_recipients`, so that fallback cannot be turned
   off. `all_updates_rule` is emitted only when there is at least one monitoring
-  notification channel to put in it — an `all_updates_rule` with no channels
+  notification channel or a Pub/Sub topic to put in it — an `all_updates_rule` with no channels
   would suppress nothing but is pointless, and combined with
   `disable_default_iam_recipients` it is the classic "fires at nobody" budget.
 - **`monitoring_notification_channels` are additive**, not a replacement for the
@@ -97,13 +131,16 @@ OpenTofu >= 1.7 for `mock_provider`. The module itself still works on 1.5.
 | `spend_basis`                      | `CURRENT_SPEND` or `FORECASTED_SPEND`, applied to every threshold rule.                              | `string`       | `"CURRENT_SPEND"` |    no    |
 | `projects`                         | Projects to scope the budget to, as `projects/<id>`. Empty covers the whole billing account.         | `list(string)` | `[]`              |    no    |
 | `monitoring_notification_channels` | Full notification channel resource names to alert, in addition to billing admins. At most 5.         | `list(string)` | `[]`              |    no    |
+| `pubsub_topic`                     | Pub/Sub topic to publish budget notifications to, as `projects/<project>/topics/<topic>`.            | `string`       | `null`            |    no    |
+| `create_pubsub_topic`              | Create the topic named by `pubsub_topic` instead of using an existing one.                           | `bool`         | `false`           |    no    |
 
 ## Outputs
 
-| Name   | Description                        |
-|--------|------------------------------------|
-| `id`   | Identifier of the budget.         |
-| `name` | Resource name of the budget.      |
+| Name              | Description                                                                  |
+|-------------------|------------------------------------------------------------------------------|
+| `id`              | Identifier of the budget.                                                    |
+| `name`            | Resource name of the budget.                                                 |
+| `pubsub_topic_id` | Full name of the Pub/Sub topic notifications are published to, or `null`.    |
 
 ## Development
 

@@ -107,3 +107,20 @@ variable "monitoring_notification_channels" {
     error_message = "Each monitoring notification channel must be a full resource name, \"projects/<project>/notificationChannels/<id>\", not a bare channel id."
   }
 }
+
+variable "pubsub_topic" {
+  description = "Pub/Sub topic to publish budget notifications to, as a full resource name (\"projects/<project>/topics/<topic>\"). Notifications are sent in addition to email and monitoring channels, not instead of them. Null (the default) disables Pub/Sub publishing."
+  type        = string
+  default     = null
+
+  validation {
+    condition     = var.pubsub_topic == null || can(regex("^projects/[^/]+/topics/[^/]+$", var.pubsub_topic))
+    error_message = "pubsub_topic must be the full resource name \"projects/<project>/topics/<topic>\", not a bare topic id."
+  }
+}
+
+variable "create_pubsub_topic" {
+  description = "Whether the module creates the topic named by pubsub_topic. When false, pubsub_topic must already exist."
+  type        = bool
+  default     = false
+}

@@ -6,6 +6,14 @@ All notable changes to this module are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- Pub/Sub budget notifications: `pubsub_topic` publishes to a topic through
+  `all_updates_rule.pubsub_topic` with `schema_version = "1.0"`, and
+  `create_pubsub_topic` creates that topic in the module. New output
+  `pubsub_topic_id`. Off by default, so existing budgets plan unchanged; the
+  default billing-admin email recipients are still never disabled.
+
 ### Changed
 
 - CI: bump actions to their current majors, pin tool versions, and restrict the
